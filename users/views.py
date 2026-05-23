@@ -1,32 +1,33 @@
-from rest_framework import generics
-from .models import User
-from .serializers import RegisterSerializer
-
-from rest_framework.views import APIView
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth import authenticate
+from .models import User
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
-class RegisterView(generics.CreateAPIView):
+@api_view(['POST'])
+def register(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
 
-    queryset = User.objects.all()
-    serializer_class = RegisterSerializer
+    if User.objects.filter(username=username).exists():
+        return Response({"error": "User already exists"}, status=400)
+
+    User.objects.create_user(username=username, password=password)
+    return Response({"message": "User created"})
 
 
-class ProfileView(APIView):
+@api_view(['POST'])
+def login(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
 
-    permission_classes = [IsAuthenticated]
+    user = authenticate(username=username, password=password)
 
-    def get(self, request):
+    if user:
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "access": str(refresh.access_token)
+        })
 
-        user = request.user
-
-        data = {
-            "username": user.username,
-            "email": user.email,
-            "role": user.role,
-            "phone": user.phone,
-            "location": user.location,
-        }
-
-        return Response(data)
+    return Response({"error": "Invalid Login"}, status=401)
